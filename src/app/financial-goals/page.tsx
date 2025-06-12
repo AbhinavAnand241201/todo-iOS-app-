@@ -21,7 +21,7 @@ import { formatDate, formatCurrency, calculatePercentage } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { getGoals, addGoal, updateGoal, deleteGoal } from '@/lib/firestoreService';
-import type { Timestamp } from 'firebase/firestore';
+import { Timestamp } from 'firebase/firestore'; // Added import for Timestamp
 
 
 const goalSchema = z.object({
