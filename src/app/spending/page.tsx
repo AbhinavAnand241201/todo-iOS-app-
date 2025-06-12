@@ -21,7 +21,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { getTransactions, addTransaction, deleteTransaction } from '@/lib/firestoreService';
 import type { Transaction } from '@/lib/types';
-import type { Timestamp } from 'firebase/firestore';
+import { Timestamp } from 'firebase/firestore';
 
 const transactionSchema = z.object({
   description: z.string().min(1, "Description is required"),
@@ -293,3 +293,4 @@ export default function SpendingPage() {
     </div>
   );
 }
+
