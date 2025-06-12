@@ -1,32 +1,72 @@
 
 "use client";
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useState, useCallback } from 'react';
 import { PageHeader } from '@/components/page-header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import Link from 'next/link';
-import { AlertTriangle, TrendingUp, DollarSign, ArrowRight, BookOpen, BarChart, PieChartIcon } from 'lucide-react';
-import { useLocalStorage } from '@/hooks/use-local-storage';
+import { AlertTriangle, TrendingUp, DollarSign, ArrowRight, BookOpen, BarChart, PieChartIcon, Loader2 } from 'lucide-react';
 import type { Transaction, Budget } from '@/lib/types';
-import { calculatePercentage, formatCurrency, formatDate } from '@/lib/utils';
-import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
+import { calculatePercentage, formatCurrency } from '@/lib/utils'; // formatDate removed as it's not directly used here
+import { ChartContainer } from "@/components/ui/chart"; // ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent removed as not directly used here
 import { Bar, BarChart as RechartsBarChart, Pie, PieChart as RechartsPieChart, ResponsiveContainer, XAxis, YAxis, Tooltip as RechartsTooltip, Cell, Legend as RechartsLegend } from "recharts";
-import { getMonth, getYear, subMonths, format as formatDateFns, startOfMonth, endOfMonth, isWithinInterval, startOfWeek, endOfWeek } from 'date-fns';
+import { subMonths, format as formatDateFns, startOfMonth, endOfMonth, isWithinInterval, startOfWeek, endOfWeek, parseISO } from 'date-fns';
+import { useAuth } from '@/contexts/auth-context';
+import { getTransactionsForDashboard, getBudgets } from '@/lib/firestoreService';
+import type { Timestamp } from 'firebase/firestore';
+
 
 const CHART_COLORS = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))"];
 
 export default function DashboardPage() {
-  const [transactions] = useLocalStorage<Transaction[]>('fiscal-compass-transactions', []);
-  const [budgets] = useLocalStorage<Budget[]>('fiscal-compass-budgets', []);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { currentUser } = useAuth();
+
+  const fetchData = useCallback(async () => {
+    if (currentUser) {
+      setIsLoading(true);
+      try {
+        const now = new Date();
+        // Fetch transactions for the last 6 months for trend + current month for category breakdown
+        const sixMonthsAgo = startOfMonth(subMonths(now, 5)); 
+        const endOfCurrentMonth = endOfMonth(now);
+
+        const [userTransactions, userBudgets] = await Promise.all([
+          getTransactionsForDashboard(currentUser.uid, sixMonthsAgo, endOfCurrentMonth),
+          getBudgets(currentUser.uid)
+        ]);
+        
+        setTransactions(userTransactions);
+        setBudgets(userBudgets);
+
+      } catch (error) {
+        console.error("Error fetching dashboard data:", error);
+        // Optionally show a toast
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      setTransactions([]);
+      setBudgets([]);
+      setIsLoading(false);
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const currentMonthBudget = useMemo(() => {
     const now = new Date();
     const currentMonthStart = startOfMonth(now);
     const currentMonthEnd = endOfMonth(now);
+
     const currentMonthTransactions = transactions.filter(t => {
-      const transactionDate = new Date(t.date);
+      const transactionDate = parseISO(t.date as string); // date is string from Firestore service
       return isWithinInterval(transactionDate, { start: currentMonthStart, end: currentMonthEnd }) && t.type === 'expense';
     });
     
@@ -43,12 +83,12 @@ export default function DashboardPage() {
 
   const recentSpendingAlert = useMemo(() => {
     const today = new Date();
-    const currentWeekStart = startOfWeek(today); // Default: week starts on Sunday
-    const currentWeekEnd = endOfWeek(today);   // Default: week ends on Saturday
+    const currentWeekStart = startOfWeek(today, { weekStartsOn: 1 }); // Monday
+    const currentWeekEnd = endOfWeek(today, { weekStartsOn: 1 });   // Sunday
 
     const recentExpenses = transactions
       .filter(t => {
-        const transactionDate = new Date(t.date);
+        const transactionDate = parseISO(t.date as string);
         return t.type === 'expense' && isWithinInterval(transactionDate, { start: currentWeekStart, end: currentWeekEnd });
       })
       .sort((a,b) => b.amount - a.amount);
@@ -78,7 +118,7 @@ export default function DashboardPage() {
     const currentMonthEnd = endOfMonth(now);
 
     const monthlyExpenses = transactions.filter(t => {
-      const transactionDate = new Date(t.date);
+      const transactionDate = parseISO(t.date as string);
       return t.type === 'expense' && isWithinInterval(transactionDate, { start: currentMonthStart, end: currentMonthEnd });
     });
 
@@ -101,7 +141,7 @@ export default function DashboardPage() {
 
       const monthlySpending = transactions
         .filter(t => {
-          const transactionDate = new Date(t.date);
+          const transactionDate = parseISO(t.date as string);
           return t.type === 'expense' && isWithinInterval(transactionDate, { start: monthStart, end: monthEnd });
         })
         .reduce((sum, t) => sum + t.amount, 0);
@@ -111,6 +151,13 @@ export default function DashboardPage() {
     return last6MonthsData;
   }, [transactions]);
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[calc(100vh-150px)]">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -125,7 +172,7 @@ export default function DashboardPage() {
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(currentMonthBudget.spent)} / {formatCurrency(currentMonthBudget.limit)}</div>
             <p className="text-xs text-muted-foreground">
-              {currentMonthBudget.limit > 0 ? `${currentMonthBudget.progress}% of budget used` : 'No monthly budget set'}
+              {currentMonthBudget.limit > 0 ? `${currentMonthBudget.progress.toFixed(0)}% of budget used` : 'No monthly budget set'}
             </p>
             <Progress value={currentMonthBudget.progress} className="mt-2 h-2" />
           </CardContent>
@@ -133,13 +180,13 @@ export default function DashboardPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Recent Spending Alert</CardTitle>
+            <CardTitle className="text-sm font-medium">This Week's Top Expense</CardTitle>
             <AlertTriangle className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
             {recentSpendingAlert ? (
               <>
-                <div className="text-xl font-bold text-destructive">High: {recentSpendingAlert.category}</div>
+                <div className="text-xl font-bold text-destructive">{recentSpendingAlert.category}</div>
                 <p className="text-xs text-muted-foreground">
                   You've spent {formatCurrency(recentSpendingAlert.amount)} on {recentSpendingAlert.category.toLowerCase()} this week.
                 </p>
@@ -148,7 +195,7 @@ export default function DashboardPage() {
                 </Link>
               </>
             ) : (
-              <p className="text-sm text-muted-foreground">No spending alerts for this week.</p>
+              <p className="text-sm text-muted-foreground">No significant spending alerts for this week.</p>
             )}
           </CardContent>
         </Card>
@@ -170,7 +217,7 @@ export default function DashboardPage() {
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2"><PieChartIcon className="h-5 w-5 text-primary" />Spending by Category (Monthly)</CardTitle>
+            <CardTitle className="flex items-center gap-2"><PieChartIcon className="h-5 w-5 text-primary" />Spending by Category (This Month)</CardTitle>
             <CardDescription>Breakdown of your expenses for the current month.</CardDescription>
           </CardHeader>
           <CardContent className="h-[300px]">
@@ -187,7 +234,7 @@ export default function DashboardPage() {
                       const x = cx + radius * Math.cos(-midAngle * (Math.PI / 180));
                       const y = cy + radius * Math.sin(-midAngle * (Math.PI / 180));
                       return (
-                        <text x={x} y={y} fill="white" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize="10px">
+                        <text x={x} y={y} fill="hsl(var(--primary-foreground))" textAnchor={x > cx ? 'start' : 'end'} dominantBaseline="central" fontSize="10px">
                           {`${(percent * 100).toFixed(0)}%`}
                         </text>
                       );
@@ -196,7 +243,7 @@ export default function DashboardPage() {
                       <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                     ))}
                   </Pie>
-                  <RechartsLegend wrapperStyle={{fontSize: '12px'}} />
+                  <RechartsLegend wrapperStyle={{fontSize: '12px', paddingTop: '10px'}} />
                 </RechartsPieChart>
               </ResponsiveContainer>
             ) : <p className="text-center text-muted-foreground pt-10">No spending data for this month.</p>}
@@ -238,8 +285,8 @@ export default function DashboardPage() {
           <Button asChild variant="secondary" className="w-full sm:w-auto">
             <Link href="/budgets">Manage Budgets</Link>
           </Button>
-          <Button asChild variant="secondary" className="w-full sm:w-auto">
-            <Link href="/payments">Make a Payment</Link>
+           <Button asChild variant="secondary" className="w-full sm:w-auto">
+            <Link href="/financial-goals">Set Financial Goals</Link>
           </Button>
         </CardContent>
       </Card>

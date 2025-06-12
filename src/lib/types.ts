@@ -1,18 +1,24 @@
+
+import type { Timestamp } from 'firebase/firestore';
+
 export interface Transaction {
   id: string;
   description: string;
   amount: number;
   type: 'expense' | 'income';
   category: string;
-  date: string; // ISO 8601 format: YYYY-MM-DD
+  date: string | Timestamp; // Stored as Timestamp in Firestore, string in forms/display
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
 }
 
 export interface Budget {
-  id: string;
+  id:string;
   category: string;
   limit: number;
-  period: 'monthly' | 'weekly' | 'yearly'; // Added weekly/yearly for flexibility
-  // 'spent' amount can be calculated dynamically
+  period: 'monthly' | 'weekly' | 'yearly';
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
 }
 
 export interface Goal {
@@ -20,7 +26,9 @@ export interface Goal {
   description: string;
   targetAmount: number;
   currentAmount: number;
-  deadline?: string; // ISO 8601 format: YYYY-MM-DD
+  deadline?: string | Timestamp | null; // Stored as Timestamp in Firestore, string in forms
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
 }
 
 // For AI Advisor Output
