@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -16,7 +17,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { generateId, formatCurrency, calculatePercentage } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { getMonth, getYear, format, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
+import { getMonth, getYear, format, startOfMonth, endOfMonth, isWithinInterval, startOfWeek, endOfWeek } from 'date-fns';
 
 const budgetSchema = z.object({
   category: z.string().min(1, "Category is required"),
@@ -35,7 +36,7 @@ export default function BudgetsPage() {
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
   const { toast } = useToast();
 
-  const { control, handleSubmit, register, reset, setValue: setFormValue } = useForm<BudgetFormData>({
+  const { control, handleSubmit, register, reset, setValue: setFormValue, formState: { errors } } = useForm<BudgetFormData>({
     resolver: zodResolver(budgetSchema),
     defaultValues: {
       category: '',
@@ -73,21 +74,25 @@ export default function BudgetsPage() {
   };
 
   const calculateSpentAmount = (budget: Budget): number => {
-    const now = new Date();
+    const today = new Date(); // Use a fresh Date object for calculations
     let relevantTransactions = transactions.filter(t => t.category === budget.category && t.type === 'expense');
 
     if (budget.period === 'monthly') {
-      const currentMonthStart = startOfMonth(now);
-      const currentMonthEnd = endOfMonth(now);
-      relevantTransactions = relevantTransactions.filter(t => isWithinInterval(new Date(t.date), { start: currentMonthStart, end: currentMonthEnd }));
+      const currentMonthStart = startOfMonth(today);
+      const currentMonthEnd = endOfMonth(today);
+      relevantTransactions = relevantTransactions.filter(t => {
+        const transactionDate = new Date(t.date);
+        return isWithinInterval(transactionDate, { start: currentMonthStart, end: currentMonthEnd });
+      });
     } else if (budget.period === 'weekly') {
-      // Example: current week (Sunday to Saturday)
-      const weekStart = new Date(now.setDate(now.getDate() - now.getDay()));
-      const weekEnd = new Date(now.setDate(now.getDate() - now.getDay() + 6));
-      relevantTransactions = relevantTransactions.filter(t => isWithinInterval(new Date(t.date), {start: startOfMonth(weekStart), end: endOfMonth(weekEnd)}));
-
+      const currentWeekStart = startOfWeek(today); // Default: week starts on Sunday
+      const currentWeekEnd = endOfWeek(today); // Default: week ends on Saturday
+      relevantTransactions = relevantTransactions.filter(t => {
+        const transactionDate = new Date(t.date);
+        return isWithinInterval(transactionDate, { start: currentWeekStart, end: currentWeekEnd });
+      });
     } else if (budget.period === 'yearly') {
-       relevantTransactions = relevantTransactions.filter(t => getYear(new Date(t.date)) === getYear(now));
+       relevantTransactions = relevantTransactions.filter(t => getYear(new Date(t.date)) === getYear(today));
     }
     return relevantTransactions.reduce((sum, t) => sum + t.amount, 0);
   };
@@ -109,7 +114,7 @@ export default function BudgetsPage() {
                   name="category"
                   control={control}
                   render={({ field }) => (
-                    <Select onValueChange={field.onChange} value={field.value} disabled={!!editingBudget && budgetCategories.includes(editingBudget.category) /* Prevent changing category when editing for simplicity or allow it based on UX choice */}>
+                    <Select onValueChange={field.onChange} value={field.value} disabled={!!editingBudget && budgetCategories.includes(editingBudget.category)}>
                       <SelectTrigger id="category">
                         <SelectValue placeholder="Select category" />
                       </SelectTrigger>
@@ -119,12 +124,12 @@ export default function BudgetsPage() {
                     </Select>
                   )}
                 />
-                {/* {errors.category && <p className="text-sm text-destructive mt-1">{errors.category.message}</p>} */}
+                {errors.category && <p className="text-sm text-destructive mt-1">{errors.category.message}</p>}
               </div>
               <div>
                 <Label htmlFor="limit">Limit ($)</Label>
                 <Input id="limit" type="number" step="0.01" {...register('limit')} placeholder="e.g., 500" />
-                {/* {errors.limit && <p className="text-sm text-destructive mt-1">{errors.limit.message}</p>} */}
+                {errors.limit && <p className="text-sm text-destructive mt-1">{errors.limit.message}</p>}
               </div>
               <div>
                 <Label htmlFor="period">Period</Label>
@@ -144,13 +149,13 @@ export default function BudgetsPage() {
                     </Select>
                   )}
                 />
-                {/* {errors.period && <p className="text-sm text-destructive mt-1">{errors.period.message}</p>} */}
+                {errors.period && <p className="text-sm text-destructive mt-1">{errors.period.message}</p>}
               </div>
             </div>
             <div className="flex gap-2">
                 <Button type="submit" className="w-full md:w-auto">{editingBudget ? 'Update Budget' : 'Add Budget'}</Button>
                 {editingBudget && (
-                    <Button variant="outline" onClick={() => { setEditingBudget(null); reset(); }} className="w-full md:w-auto">Cancel Edit</Button>
+                    <Button variant="outline" onClick={() => { setEditingBudget(null); reset({ category: '', limit: 0, period: 'monthly' }); }} className="w-full md:w-auto">Cancel Edit</Button>
                 )}
             </div>
           </form>

@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useMemo } from 'react';
@@ -12,7 +13,7 @@ import type { Transaction, Budget } from '@/lib/types';
 import { calculatePercentage, formatCurrency, formatDate } from '@/lib/utils';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
 import { Bar, BarChart as RechartsBarChart, Pie, PieChart as RechartsPieChart, ResponsiveContainer, XAxis, YAxis, Tooltip as RechartsTooltip, Cell, Legend as RechartsLegend } from "recharts";
-import { getMonth, getYear, subMonths, format as formatDateFns, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns';
+import { getMonth, getYear, subMonths, format as formatDateFns, startOfMonth, endOfMonth, isWithinInterval, startOfWeek, endOfWeek } from 'date-fns';
 
 const CHART_COLORS = ["hsl(var(--chart-1))", "hsl(var(--chart-2))", "hsl(var(--chart-3))", "hsl(var(--chart-4))", "hsl(var(--chart-5))"];
 
@@ -22,9 +23,11 @@ export default function DashboardPage() {
 
   const currentMonthBudget = useMemo(() => {
     const now = new Date();
+    const currentMonthStart = startOfMonth(now);
+    const currentMonthEnd = endOfMonth(now);
     const currentMonthTransactions = transactions.filter(t => {
       const transactionDate = new Date(t.date);
-      return getMonth(transactionDate) === getMonth(now) && getYear(transactionDate) === getYear(now) && t.type === 'expense';
+      return isWithinInterval(transactionDate, { start: currentMonthStart, end: currentMonthEnd }) && t.type === 'expense';
     });
     
     const monthlyBudgets = budgets.filter(b => b.period === 'monthly');
@@ -39,23 +42,29 @@ export default function DashboardPage() {
   }, [transactions, budgets]);
 
   const recentSpendingAlert = useMemo(() => {
-    const oneWeekAgo = subMonths(new Date(), 0); // effectively today, for this week's spending
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    const today = new Date();
+    const currentWeekStart = startOfWeek(today); // Default: week starts on Sunday
+    const currentWeekEnd = endOfWeek(today);   // Default: week ends on Saturday
 
     const recentExpenses = transactions
-      .filter(t => t.type === 'expense' && new Date(t.date) >= oneWeekAgo)
+      .filter(t => {
+        const transactionDate = new Date(t.date);
+        return t.type === 'expense' && isWithinInterval(transactionDate, { start: currentWeekStart, end: currentWeekEnd });
+      })
       .sort((a,b) => b.amount - a.amount);
 
     if (recentExpenses.length === 0) return null;
     
-    // Simple: highest spending category this week
     const expensesByCategory: Record<string, number> = {};
     recentExpenses.forEach(t => {
       expensesByCategory[t.category] = (expensesByCategory[t.category] || 0) + t.amount;
     });
-    const highestCategory = Object.entries(expensesByCategory).sort(([,a],[,b]) => b-a)[0];
 
-    if (!highestCategory) return null;
+    const sortedCategories = Object.entries(expensesByCategory).sort(([,a],[,b]) => b-a);
+    
+    if (sortedCategories.length === 0) return null;
+    
+    const highestCategory = sortedCategories[0];
 
     return {
       category: highestCategory[0],
@@ -77,7 +86,7 @@ export default function DashboardPage() {
     monthlyExpenses.forEach(t => {
       data[t.category] = (data[t.category] || 0) + t.amount;
     });
-    return Object.entries(data).map(([name, value]) => ({ name, value, fill: CHART_COLORS[Math.floor(Math.random() * CHART_COLORS.length)] }));
+    return Object.entries(data).map(([name, value], index) => ({ name, value, fill: CHART_COLORS[index % CHART_COLORS.length] }));
   }, [transactions]);
   
   const spendingTrendChartData = useMemo(() => {
@@ -116,7 +125,7 @@ export default function DashboardPage() {
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(currentMonthBudget.spent)} / {formatCurrency(currentMonthBudget.limit)}</div>
             <p className="text-xs text-muted-foreground">
-              {currentMonthBudget.progress}% of budget used
+              {currentMonthBudget.limit > 0 ? `${currentMonthBudget.progress}% of budget used` : 'No monthly budget set'}
             </p>
             <Progress value={currentMonthBudget.progress} className="mt-2 h-2" />
           </CardContent>
@@ -139,7 +148,7 @@ export default function DashboardPage() {
                 </Link>
               </>
             ) : (
-              <p className="text-sm text-muted-foreground">No significant spending alerts recently.</p>
+              <p className="text-sm text-muted-foreground">No spending alerts for this week.</p>
             )}
           </CardContent>
         </Card>
