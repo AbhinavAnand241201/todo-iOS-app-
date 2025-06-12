@@ -1,7 +1,7 @@
 
 "use client";
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   SidebarProvider,
   Sidebar,
@@ -11,14 +11,16 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarInset,
-  SidebarTrigger,
+  SidebarFooter, // Added SidebarFooter import
 } from '@/components/ui/sidebar';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { Compass, LayoutDashboard, ArrowLeftRight, PiggyBank, Target, Brain, CreditCard, Menu } from 'lucide-react';
+import { usePathname, redirect } from 'next/navigation';
+import { Compass, LayoutDashboard, ArrowLeftRight, PiggyBank, Target, Brain, CreditCard, Menu, LogOut, Loader2 } from 'lucide-react'; // Added LogOut & Loader2
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useAuth } from '@/contexts/auth-context'; // Added useAuth import
+import { useToast } from '@/hooks/use-toast';
 
 
 const navItems = [
@@ -33,6 +35,48 @@ const navItems = [
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isMobile = useIsMobile();
+  const { currentUser, loading, logout } = useAuth();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (!loading) {
+      if (!currentUser && pathname !== '/auth') {
+        redirect('/auth');
+      } else if (currentUser && pathname === '/auth') {
+        redirect('/dashboard');
+      }
+    }
+  }, [currentUser, loading, pathname]);
+
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
+  
+  // If user is not authenticated and not on auth page, children won't be rendered due to redirect.
+  // AuthPage itself handles the scenario where a user is already logged in or auth is loading.
+  // So, if we reach here and are on /auth page without a user, it means AuthPage should render.
+  if (!currentUser && pathname !== '/auth') {
+     // This case should be handled by redirect, but as a fallback, show loader or minimal content.
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-background">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
+  
+  // If user is logged in and on auth page, redirect will handle it.
+  // Otherwise, render the main app layout.
+
+  const handleLogout = async () => {
+    await logout();
+    toast({ title: "Logged Out", description: "You have been successfully logged out." });
+    // Redirect handled by useEffect
+  };
 
   const sidebarContent = (
     <>
@@ -60,8 +104,30 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           ))}
         </SidebarMenu>
       </SidebarContent>
+      {currentUser && (
+        <SidebarFooter className="p-2 mt-auto">
+          <SidebarMenu>
+            <SidebarMenuItem>
+                <SidebarMenuButton
+                  onClick={handleLogout}
+                  className="font-body w-full"
+                  tooltip={{ children: "Logout", className: "font-body" }}
+                >
+                  <LogOut className="h-5 w-5" />
+                  <span>Logout</span>
+                </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarFooter>
+      )}
     </>
   );
+
+  // If on /auth page and user is not logged in, render children (AuthPage) without AppLayout structure.
+  if (!currentUser && pathname === '/auth') {
+    return <>{children}</>;
+  }
+
 
   if (isMobile) {
     return (
