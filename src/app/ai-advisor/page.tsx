@@ -3,7 +3,7 @@
 
 import React, { useState } from 'react';
 import { PageHeader } from '@/components/page-header';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -13,9 +13,10 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { generateFinancialPlan, GenerateFinancialPlanInput, GenerateFinancialPlanOutput } from '@/ai/flows/generate-financial-plan';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Sparkles, FileText, CheckCircle, BarChart2, TrendingUp } from 'lucide-react';
+import { Loader2, Sparkles, FileText, CheckCircle, BarChart2, TrendingUp, BadgeAlert, Lightbulb, Flag } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { formatCurrency } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge'; // Added Badge import
 
 const advisorSchema = z.object({
   spendingPatterns: z.string().min(50, "Please describe your spending patterns in at least 50 characters."),
@@ -24,8 +25,11 @@ const advisorSchema = z.object({
 
 type AdvisorFormData = z.infer<typeof advisorSchema>;
 
-// Define a type for individual spending analysis items based on the new schema
 type SpendingAnalysisItem = GenerateFinancialPlanOutput["spendingAnalysis"][0];
+type ActionStepItem = GenerateFinancialPlanOutput["actionSteps"][0];
+type InvestmentStrategyItem = GenerateFinancialPlanOutput["investmentPlan"][0];
+type ProgressMilestoneItem = GenerateFinancialPlanOutput["progressTracking"][0];
+
 
 export default function AiAdvisorPage() {
   const [financialPlan, setFinancialPlan] = useState<GenerateFinancialPlanOutput | null>(null);
@@ -57,15 +61,6 @@ export default function AiAdvisorPage() {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const renderTextWithLineBreaks = (text: string) => {
-    return text.split('\n').map((line, index) => (
-      <React.Fragment key={index}>
-        {line}
-        <br />
-      </React.Fragment>
-    ));
   };
 
   return (
@@ -128,7 +123,7 @@ export default function AiAdvisorPage() {
                     <CardContent className="space-y-4">
                       {financialPlan.spendingAnalysis && financialPlan.spendingAnalysis.length > 0 ? (
                         financialPlan.spendingAnalysis.map((item: SpendingAnalysisItem, index: number) => (
-                          <div key={index} className="py-3">
+                          <div key={index} className="py-3 px-1 rounded-md border border-border/50 bg-background/50 shadow-sm">
                             <div className="flex justify-between items-center mb-1">
                               <p className="font-semibold text-foreground">{item.categoryName}</p>
                               <p className="text-sm text-muted-foreground">
@@ -139,7 +134,6 @@ export default function AiAdvisorPage() {
                             <div className="h-1 w-full bg-primary/20 rounded-full">
                                <div
                                 className="h-1 rounded-full bg-primary"
-                                // Basic visual, could be more dynamic if AI provided a percentage or similar
                                 style={{ width: `${Math.min(100, Math.max(0, (item.newAmount / (item.oldAmount || item.newAmount || 1)) * 50 + 25 ))}%` }}
                               />
                             </div>
@@ -153,25 +147,65 @@ export default function AiAdvisorPage() {
                 </TabsContent>
                 <TabsContent value="actionSteps">
                   <Card className="bg-muted/30">
-                    <CardHeader><CardTitle>Action Steps</CardTitle></CardHeader>
-                    <CardContent className="prose prose-sm max-w-none">
-                       {renderTextWithLineBreaks(financialPlan.actionSteps)}
+                    <CardHeader><CardTitle className="flex items-center gap-2"><Lightbulb className="h-5 w-5 text-primary"/>Action Steps</CardTitle></CardHeader>
+                    <CardContent className="space-y-3">
+                       {financialPlan.actionSteps && financialPlan.actionSteps.length > 0 ? (
+                        financialPlan.actionSteps.map((item: ActionStepItem, index: number) => (
+                          <Card key={index} className="p-3 bg-background/70 shadow">
+                            <CardDescription className="flex items-start gap-2">
+                                <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
+                                <span>{item.step}</span>
+                            </CardDescription>
+                            {item.priority && (
+                                <Badge variant={
+                                    item.priority.toLowerCase() === 'high' ? 'destructive' : 
+                                    item.priority.toLowerCase() === 'medium' ? 'secondary' : 'outline'
+                                } className="mt-1 text-xs">{item.priority} Priority</Badge>
+                            )}
+                            {item.details && <p className="text-xs text-muted-foreground mt-1 pl-6">{item.details}</p>}
+                          </Card>
+                        ))
+                      ) : (
+                        <p>No action steps provided.</p>
+                      )}
                     </CardContent>
                   </Card>
                 </TabsContent>
                 <TabsContent value="investmentPlan">
                   <Card className="bg-muted/30">
-                    <CardHeader><CardTitle>Investment Plan</CardTitle></CardHeader>
-                    <CardContent className="prose prose-sm max-w-none">
-                       {renderTextWithLineBreaks(financialPlan.investmentPlan)}
+                    <CardHeader><CardTitle className="flex items-center gap-2"><TrendingUp className="h-5 w-5 text-primary"/>Investment Plan</CardTitle></CardHeader>
+                    <CardContent className="space-y-3">
+                      {financialPlan.investmentPlan && financialPlan.investmentPlan.length > 0 ? (
+                        financialPlan.investmentPlan.map((item: InvestmentStrategyItem, index: number) => (
+                           <Card key={index} className="p-3 bg-background/70 shadow">
+                            <CardTitle className="text-md mb-1">{item.term}</CardTitle>
+                            <CardDescription>{item.strategy}</CardDescription>
+                            {item.rationale && <p className="text-xs text-muted-foreground mt-1">{item.rationale}</p>}
+                          </Card>
+                        ))
+                      ) : (
+                        <p>No investment plan provided.</p>
+                      )}
                     </CardContent>
                   </Card>
                 </TabsContent>
                 <TabsContent value="progressTracking">
                   <Card className="bg-muted/30">
-                    <CardHeader><CardTitle>Progress Tracking</CardTitle></CardHeader>
-                    <CardContent className="prose prose-sm max-w-none">
-                      {renderTextWithLineBreaks(financialPlan.progressTracking)}
+                    <CardHeader><CardTitle className="flex items-center gap-2"><Flag className="h-5 w-5 text-primary"/>Progress Tracking Milestones</CardTitle></CardHeader>
+                     <CardContent className="space-y-3">
+                      {financialPlan.progressTracking && financialPlan.progressTracking.length > 0 ? (
+                        financialPlan.progressTracking.map((item: ProgressMilestoneItem, index: number) => (
+                           <Card key={index} className="p-3 bg-background/70 shadow">
+                            <p className="font-semibold text-foreground">{item.milestone}</p>
+                            <div className="flex justify-between items-center text-sm text-muted-foreground mt-1">
+                                <span>Target: {item.target}</span>
+                                <span>Timeframe: {item.timeframe}</span>
+                            </div>
+                          </Card>
+                        ))
+                      ) : (
+                        <p>No progress tracking milestones provided.</p>
+                      )}
                     </CardContent>
                   </Card>
                 </TabsContent>
@@ -186,4 +220,3 @@ export default function AiAdvisorPage() {
     </div>
   );
 }
-

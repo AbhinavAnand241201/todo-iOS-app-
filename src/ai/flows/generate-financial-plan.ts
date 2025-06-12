@@ -32,16 +32,31 @@ const SpendingCategoryAnalysisSchema = z.object({
   changeDescription: z.string().describe('A brief human-readable description of the change (e.g., "Decrease by 10%", "Allocate $50 more", "No change suggested").'),
 });
 
+const ActionStepSchema = z.object({
+  step: z.string().describe('A concise description of the action step.'),
+  priority: z.string().optional().describe('The priority of the action step (e.g., High, Medium, Low).'),
+  details: z.string().optional().describe('Optional further details or explanation for the action step.'),
+});
+
+const InvestmentStrategySchema = z.object({
+  term: z.string().describe('The investment term, e.g., "Short-Term Goals" or "Long-Term Goals".'),
+  strategy: z.string().describe('The specific investment strategy or advice for this term.'),
+  rationale: z.string().optional().describe('Optional rationale behind the strategy.'),
+});
+
+const ProgressMilestoneSchema = z.object({
+  milestone: z.string().describe('A specific, trackable milestone.'),
+  target: z.string().describe('The target for this milestone (e.g., "$500 saved", "Debt reduced by 10%").'),
+  timeframe: z.string().describe('The suggested timeframe to achieve this milestone (e.g., "Within 3 months", "By end of year").'),
+});
+
+
 const GenerateFinancialPlanOutputSchema = z.object({
   summary: z.string().describe('A high-level summary of the financial plan.'),
   spendingAnalysis: z.array(SpendingCategoryAnalysisSchema).describe('Detailed breakdown of proposed budget changes per category. Each item should include categoryName, oldAmount, newAmount, and changeDescription.'),
-  actionSteps: z.string().describe('A checklist of financial advice with priorities, formatted as a multi-line string.'),
-  investmentPlan: z
-    .string()
-    .describe('Investment strategies broken down by short-term and long-term goals, formatted as a multi-line string.'),
-  progressTracking: z
-    .string()
-    .describe('Trackable milestones with targets and timeframes, formatted as a multi-line string.'),
+  actionSteps: z.array(ActionStepSchema).describe('A list of actionable financial advice items. Each item should include a "step", optional "priority", and optional "details".'),
+  investmentPlan: z.array(InvestmentStrategySchema).describe('Investment strategies broken down by short-term and long-term goals. Each item should include "term", "strategy", and optional "rationale".'),
+  progressTracking: z.array(ProgressMilestoneSchema).describe('Trackable milestones. Each item should include "milestone", "target", and "timeframe".'),
 });
 
 export type GenerateFinancialPlanOutput = z.infer<
@@ -64,20 +79,32 @@ you will generate a personalized financial plan.
 Spending Patterns: {{{spendingPatterns}}}
 Financial Goals: {{{financialGoals}}}
 
-Your financial plan must include the following sections:
+Your financial plan must include the following sections, formatted as JSON according to the output schema:
 
-- Summary: A high-level overview of the financial plan (string).
-- Spending Analysis: This section MUST be an array of objects. Each object represents a spending category and MUST contain the following fields:
-    - categoryName (string): The name of the spending category (e.g., "Rent & Essentials", "Groceries", "EMI", "Fashion & Discretionary", "Car Savings", "Remaining/Other Savings").
-    - oldAmount (number): The user's current estimated spending or allocation for this category.
-    - newAmount (number): Your suggested new spending or allocation for this category.
-    - changeDescription (string): A brief, human-readable description of the change (e.g., "Decrease by 10%", "Increase by $50 to $250", "No change", "New allocation: $500").
+- summary (string): A high-level overview of the financial plan.
+- spendingAnalysis (array of objects): Each object represents a spending category and MUST contain:
+    - categoryName (string): e.g., "Rent & Essentials", "Groceries".
+    - oldAmount (number): User's current estimated spending.
+    - newAmount (number): Your suggested new spending.
+    - changeDescription (string): Brief description of the change.
   Ensure you cover key areas like essentials, discretionary spending, and savings.
-- Action Steps: A checklist of financial advice with priorities (string, use markdown for lists if appropriate).
-- Investment Plan: Investment strategies broken down by short-term and long-term goals (string).
-- Progress Tracking: Trackable milestones with targets and timeframes (string).
 
-Focus on providing actionable and clear advice. For the Spending Analysis, ensure the amounts are numbers and the descriptions are concise.
+- actionSteps (array of objects): A list of actionable financial advice. Each object MUST contain:
+    - step (string): Concise description of the action.
+    - priority (string, optional): Priority (e.g., "High", "Medium", "Low").
+    - details (string, optional): Further explanation.
+
+- investmentPlan (array of objects): Investment strategies. Each object MUST contain:
+    - term (string): e.g., "Short-Term Goals", "Long-Term Goals".
+    - strategy (string): Specific strategy for this term.
+    - rationale (string, optional): Reasoning for the strategy.
+
+- progressTracking (array of objects): Trackable milestones. Each object MUST contain:
+    - milestone (string): Specific trackable milestone.
+    - target (string): Target for this milestone.
+    - timeframe (string): Suggested timeframe.
+
+Focus on providing actionable and clear advice. Ensure all outputs strictly adhere to the specified object structures for each array.
 `,
 });
 
@@ -92,4 +119,3 @@ const generateFinancialPlanFlow = ai.defineFlow(
     return output!;
   }
 );
-
