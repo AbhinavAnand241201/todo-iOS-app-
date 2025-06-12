@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState } from 'react';
@@ -14,6 +15,7 @@ import { generateFinancialPlan, GenerateFinancialPlanInput, GenerateFinancialPla
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Sparkles, FileText, CheckCircle, BarChart2, TrendingUp } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { formatCurrency } from '@/lib/utils';
 
 const advisorSchema = z.object({
   spendingPatterns: z.string().min(50, "Please describe your spending patterns in at least 50 characters."),
@@ -21,6 +23,9 @@ const advisorSchema = z.object({
 });
 
 type AdvisorFormData = z.infer<typeof advisorSchema>;
+
+// Define a type for individual spending analysis items based on the new schema
+type SpendingAnalysisItem = GenerateFinancialPlanOutput["spendingAnalysis"][0];
 
 export default function AiAdvisorPage() {
   const [financialPlan, setFinancialPlan] = useState<GenerateFinancialPlanOutput | null>(null);
@@ -120,8 +125,29 @@ export default function AiAdvisorPage() {
                 <TabsContent value="spendingAnalysis">
                   <Card className="bg-muted/30">
                     <CardHeader><CardTitle>Spending Analysis</CardTitle></CardHeader>
-                    <CardContent className="prose prose-sm max-w-none">
-                      {renderTextWithLineBreaks(financialPlan.spendingAnalysis)}
+                    <CardContent className="space-y-4">
+                      {financialPlan.spendingAnalysis && financialPlan.spendingAnalysis.length > 0 ? (
+                        financialPlan.spendingAnalysis.map((item: SpendingAnalysisItem, index: number) => (
+                          <div key={index} className="py-3">
+                            <div className="flex justify-between items-center mb-1">
+                              <p className="font-semibold text-foreground">{item.categoryName}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {formatCurrency(item.oldAmount)} &rarr; {formatCurrency(item.newAmount)}
+                              </p>
+                            </div>
+                            <p className="text-xs text-muted-foreground mb-2">{item.changeDescription}</p>
+                            <div className="h-1 w-full bg-primary/20 rounded-full">
+                               <div
+                                className="h-1 rounded-full bg-primary"
+                                // Basic visual, could be more dynamic if AI provided a percentage or similar
+                                style={{ width: `${Math.min(100, Math.max(0, (item.newAmount / (item.oldAmount || item.newAmount || 1)) * 50 + 25 ))}%` }}
+                              />
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p>No spending analysis data available.</p>
+                      )}
                     </CardContent>
                   </Card>
                 </TabsContent>
@@ -160,3 +186,4 @@ export default function AiAdvisorPage() {
     </div>
   );
 }
+
