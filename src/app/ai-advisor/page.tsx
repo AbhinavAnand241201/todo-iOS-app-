@@ -63,9 +63,9 @@ export default function AiAdvisorPage() {
     }
   };
 
-  const renderTextWithLineBreaks = (text: string | undefined | null) => {
+  const renderTextWithLineBreaks = (text: string | undefined | null): React.ReactNode => {
     if (typeof text !== 'string' || !text) {
-      return text; 
+      return null; 
     }
     return text.split('\n').map((line, index, array) => (
       <React.Fragment key={index}>
