@@ -13,10 +13,10 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { generateFinancialPlan, GenerateFinancialPlanInput, GenerateFinancialPlanOutput } from '@/ai/flows/generate-financial-plan';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Sparkles, FileText, CheckCircle, BarChart2, TrendingUp, BadgeAlert, Lightbulb, Flag } from 'lucide-react';
+import { Loader2, Sparkles, FileText, CheckCircle, BarChart2, TrendingUp, Lightbulb, Flag } from 'lucide-react'; 
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { formatCurrency } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge'; // Added Badge import
+import { Badge } from '@/components/ui/badge';
 
 const advisorSchema = z.object({
   spendingPatterns: z.string().min(50, "Please describe your spending patterns in at least 50 characters."),
@@ -63,6 +63,18 @@ export default function AiAdvisorPage() {
     }
   };
 
+  const renderTextWithLineBreaks = (text: string | undefined | null) => {
+    if (typeof text !== 'string' || !text) {
+      return text; 
+    }
+    return text.split('\n').map((line, index, array) => (
+      <React.Fragment key={index}>
+        {line}
+        {index < array.length - 1 && <br />}
+      </React.Fragment>
+    ));
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader title="AI Financial Advisor" description="Get personalized financial advice based on your habits and goals." />
@@ -106,7 +118,7 @@ export default function AiAdvisorPage() {
         <Card>
           <CardHeader>
             <CardTitle>Your Personalized Financial Plan</CardTitle>
-            <CardDescription>{financialPlan.summary}</CardDescription>
+            <CardDescription>{renderTextWithLineBreaks(financialPlan.summary)}</CardDescription>
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="spendingAnalysis" className="w-full">
@@ -123,19 +135,19 @@ export default function AiAdvisorPage() {
                     <CardContent className="space-y-4">
                       {financialPlan.spendingAnalysis && financialPlan.spendingAnalysis.length > 0 ? (
                         financialPlan.spendingAnalysis.map((item: SpendingAnalysisItem, index: number) => (
-                          <div key={index} className="py-3 px-1 rounded-md border border-border/50 bg-background/50 shadow-sm">
+                          <div key={index} className="py-3 px-4 rounded-md border border-border/50 bg-background/50 shadow-sm">
                             <div className="flex justify-between items-center mb-1">
                               <p className="font-semibold text-foreground">{item.categoryName}</p>
                               <p className="text-sm text-muted-foreground">
                                 {formatCurrency(item.oldAmount)} &rarr; {formatCurrency(item.newAmount)}
                               </p>
                             </div>
-                            <p className="text-xs text-muted-foreground mb-2">{item.changeDescription}</p>
-                            <div className="h-1 w-full bg-primary/20 rounded-full">
-                               <div
-                                className="h-1 rounded-full bg-primary"
-                                style={{ width: `${Math.min(100, Math.max(0, (item.newAmount / (item.oldAmount || item.newAmount || 1)) * 50 + 25 ))}%` }}
-                              />
+                            <p className="text-xs text-muted-foreground">{item.changeDescription}</p>
+                            <div className="mt-2 h-1.5 w-full bg-primary/20 rounded-full overflow-hidden">
+                                <div
+                                    className="h-1.5 rounded-full bg-primary"
+                                    style={{ width: `${Math.min(100, (item.newAmount / Math.max(item.oldAmount, item.newAmount, 1)) * 100)}%` }}
+                                />
                             </div>
                           </div>
                         ))
@@ -152,15 +164,15 @@ export default function AiAdvisorPage() {
                        {financialPlan.actionSteps && financialPlan.actionSteps.length > 0 ? (
                         financialPlan.actionSteps.map((item: ActionStepItem, index: number) => (
                           <Card key={index} className="p-3 bg-background/70 shadow">
-                            <CardDescription className="flex items-start gap-2">
+                            <div className="flex items-start gap-2">
                                 <CheckCircle className="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
-                                <span>{item.step}</span>
-                            </CardDescription>
+                                <p className="font-medium text-foreground flex-1">{item.step}</p>
+                            </div>
                             {item.priority && (
                                 <Badge variant={
                                     item.priority.toLowerCase() === 'high' ? 'destructive' : 
                                     item.priority.toLowerCase() === 'medium' ? 'secondary' : 'outline'
-                                } className="mt-1 text-xs">{item.priority} Priority</Badge>
+                                } className="mt-1.5 text-xs ml-6">{item.priority} Priority</Badge>
                             )}
                             {item.details && <p className="text-xs text-muted-foreground mt-1 pl-6">{item.details}</p>}
                           </Card>
@@ -178,9 +190,9 @@ export default function AiAdvisorPage() {
                       {financialPlan.investmentPlan && financialPlan.investmentPlan.length > 0 ? (
                         financialPlan.investmentPlan.map((item: InvestmentStrategyItem, index: number) => (
                            <Card key={index} className="p-3 bg-background/70 shadow">
-                            <CardTitle className="text-md mb-1">{item.term}</CardTitle>
-                            <CardDescription>{item.strategy}</CardDescription>
-                            {item.rationale && <p className="text-xs text-muted-foreground mt-1">{item.rationale}</p>}
+                            <p className="font-semibold text-md text-foreground mb-0.5">{item.term}</p>
+                            <p className="text-sm text-muted-foreground">{item.strategy}</p>
+                            {item.rationale && <p className="text-xs text-muted-foreground mt-1 italic">{item.rationale}</p>}
                           </Card>
                         ))
                       ) : (
@@ -197,9 +209,9 @@ export default function AiAdvisorPage() {
                         financialPlan.progressTracking.map((item: ProgressMilestoneItem, index: number) => (
                            <Card key={index} className="p-3 bg-background/70 shadow">
                             <p className="font-semibold text-foreground">{item.milestone}</p>
-                            <div className="flex justify-between items-center text-sm text-muted-foreground mt-1">
+                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center text-sm text-muted-foreground mt-1">
                                 <span>Target: {item.target}</span>
-                                <span>Timeframe: {item.timeframe}</span>
+                                <span className="mt-0.5 sm:mt-0">Timeframe: {item.timeframe}</span>
                             </div>
                           </Card>
                         ))
@@ -220,3 +232,5 @@ export default function AiAdvisorPage() {
     </div>
   );
 }
+
+    
