@@ -1,4 +1,4 @@
-import type {NextConfig} from 'next';
+import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
   /* config options here */
@@ -14,7 +14,9 @@ const nextConfig: NextConfig = {
     // Set to true only if you are aware of the implications and plan to fix errors later.
     ignoreDuringBuilds: true,
   },
+  output: 'standalone',
   images: {
+    domains: ['lh3.googleusercontent.com', 'avatars.githubusercontent.com'],
     remotePatterns: [
       {
         protocol: 'https',
